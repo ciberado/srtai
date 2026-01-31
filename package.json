@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @srtai/core --if-present && npm run build -w @srtai/cli --if-present",
+    "build": "npm run build --prefix packages/core --if-present && npm run build --prefix packages/cli --if-present",
     "test": "echo \"Run package tests individually\"",
     "lint": "echo \"No linter configured\""
   }
