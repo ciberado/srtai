@@ -7,6 +7,7 @@ export type TranslateOptions = {
   retries?: number;
   dryRun?: boolean; // if true, returns mocked translations
   targetLanguage?: string; // e.g. 'es'
+  invokeOverride?: (modelId: string, region: string | undefined, prompt: string) => Promise<string>;
 };
 
 async function invokeBedrock(modelId: string, region: string | undefined, prompt: string) {
@@ -77,7 +78,9 @@ export async function translateEntries(entries: SrtEntry[], opts: TranslateOptio
           texts: batch
         });
 
-        const raw = await invokeBedrock(modelId, region, prompt);
+        const raw = opts.invokeOverride
+          ? await opts.invokeOverride(modelId, region, prompt)
+          : await invokeBedrock(modelId, region, prompt);
 
         // Try to parse JSON response first, otherwise split by separator
         let parsed: string[] | null = null;
