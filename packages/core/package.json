@@ -9,6 +9,10 @@
     "test": "vitest"
   },
   "dependencies": {},
+  "dependencies": {
+    "subtitle": "^4.0.0",
+    "he": "^1.2.0"
+  },
   "devDependencies": {
     "typescript": "^5.2.0",
     "vitest": "^1.0.0",
