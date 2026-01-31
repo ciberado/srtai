@@ -1,0 +1,13 @@
+{
+  "name": "srtai",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @srtai/core --if-present && npm run build -w @srtai/cli --if-present",
+    "test": "echo \"Run package tests individually\"",
+    "lint": "echo \"No linter configured\""
+  }
+}
