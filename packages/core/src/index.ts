@@ -3,3 +3,4 @@ export function helloCore() {
 }
 
 export * from './parser';
+export * from './translator';
