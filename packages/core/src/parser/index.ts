@@ -1,4 +1,3 @@
-import { parse as parseSrtRaw, stringify as stringifySrt } from 'subtitle';
 import he from 'he';
 
 export type SrtEntry = {
@@ -8,33 +7,59 @@ export type SrtEntry = {
   text: string; // raw text as in file (may include tags)
 };
 
+function parseTimeToMs(t: string): number {
+  // t like HH:MM:SS,mmm
+  const m = t.trim().match(/(\d+):(\d+):(\d+),(\d+)/);
+  if (!m) return 0;
+  const [, hh, mm, ss, ms] = m;
+  return (
+    parseInt(hh, 10) * 3600 * 1000 +
+    parseInt(mm, 10) * 60 * 1000 +
+    parseInt(ss, 10) * 1000 +
+    parseInt(ms, 10)
+  );
+}
+
+function formatMsToTime(ms: number): string {
+  const hours = Math.floor(ms / 3600000);
+  const minutes = Math.floor((ms % 3600000) / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  const millis = ms % 1000;
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)},${String(millis).padStart(3, '0')}`;
+}
+
 export function parseSrt(srt: string): SrtEntry[] {
-  const raw = parseSrtRaw(srt);
-  // `subtitle.parse` returns items with { type: 'cue', data: { start, end, text } }
-  const entries: SrtEntry[] = raw
-    .filter((i: any) => i.type === 'cue')
-    .map((c: any, idx: number) => ({
+  const parts = srt.split(/\r?\n\r?\n+/).map((p) => p.trim()).filter(Boolean);
+  const entries: SrtEntry[] = parts.map((block, idx) => {
+    const lines = block.split(/\r?\n/);
+    // first line sometimes is numeric id
+    let ptr = 0;
+    if (/^\d+$/.test(lines[0].trim())) ptr = 1;
+    const timeLine = lines[ptr++] || '';
+    const [startRaw, endRaw] = timeLine.split('-->').map((s) => s && s.trim());
+    const text = lines.slice(ptr).join('\n');
+    return {
       id: idx + 1,
-      start: c.data.start,
-      end: c.data.end,
-      text: c.data.text
-    }));
+      start: parseTimeToMs(startRaw || '00:00:00,000'),
+      end: parseTimeToMs(endRaw || '00:00:00,000'),
+      text
+    };
+  });
   return entries;
 }
 
 export function serializeSrt(entries: SrtEntry[]): string {
-  const cues = entries.map((e) => ({
-    start: e.start,
-    end: e.end,
-    text: e.text
-  }));
-  return stringifySrt(cues);
+  return entries
+    .map((e, i) => {
+      const idx = i + 1;
+      const t = `${formatMsToTime(e.start)} --> ${formatMsToTime(e.end)}`;
+      return `${idx}\n${t}\n${e.text}`;
+    })
+    .join('\n\n') + '\n\n';
 }
 
 export function extractTexts(entries: SrtEntry[]): string[] {
-  // Return an array of texts suitable for sending to the translator.
-  // We decode HTML entities but preserve inline tags — tag-preserving
-  // handling will be responsibility of translator to respect tags.
   return entries.map((e) => he.decode(e.text));
 }
 
