@@ -1,0 +1,63 @@
+*.zzz
+tmp/
+
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# testing
+coverage
+packages/*/coverage/
+*.lcov
+
+# production
+build
+dist
+packages/*/dist/
+*.tsbuildinfo
+
+# knowledge base
+packages/kbase-backend/knowledge
+
+# authentication database
+*.sqlite
+*.db
+*.sqlite-shm
+*.sqlite-wal
+
+# assessment backend specific
+packages/assessment-backend/assessments.sqlite*
+packages/assessment-backend/auth.sqlite*
+packages/assessment-backend/storage/
+packages/assessment-backend/test-storage*/
+packages/assessment-backend/*test*.sqlite
+packages/assessment-backend/api-test-storage*/
+packages/assessment-backend/integration-test*.sqlite
+packages/assessment-backend/integration-storage*/
+packages/assessment-backend/.env
+packages/assessment-backend/dist/
+packages/assessment-backend/tsconfig.tsbuildinfo
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# logs
+*.log
+logs/
+packages/*/logs/
+
+# IDE
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+.env
