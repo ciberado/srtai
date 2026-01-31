@@ -72,28 +72,57 @@ export async function translateEntries(entries: SrtEntry[], opts: TranslateOptio
           break;
         }
 
-        // Build a prompt joining entries with a separator that can be split later
-        const prompt = JSON.stringify({
-          target_language: target,
+        // Build a clear prompt with explicit instructions requesting ONLY valid JSON
+        // The model must respond with a JSON object: { "translations": ["...", "..."] }
+        // Each element must correspond one-to-one to the input `texts` and preserve inline tags (e.g. <font>...) unchanged,
+        // only translating inner text. No additional commentary or metadata must be included outside the JSON.
+        const instruction = `Translate the following subtitle entries to ${target}.\n` +
+          `Return ONLY a single valid JSON object with exactly one key named \"translations\" whose value is an array of strings.\n` +
+          `Each translation must preserve any inline HTML-like tags (for example <font color=\"#fff\">...</font>) in-place; translate only the textual content inside tags.\n` +
+          `Do not include any extra text, markdown, or explanation. Example output:\n` +
+          `{\n  \"translations\": [\"translated text 1\", \"translated text 2\"]\n}`;
+
+        const promptPayload = {
+          instruction,
           texts: batch
-        });
+        };
+        const prompt = JSON.stringify(promptPayload);
 
         const raw = opts.invokeOverride
           ? await opts.invokeOverride(modelId, region, prompt)
           : await invokeBedrock(modelId, region, prompt);
 
-        // Try to parse JSON response first, otherwise split by separator
+        // Robust JSON extraction: model may emit extra chars; try to find first JSON object in the response
+        function extractJson(text: string): any | null {
+          const firstBrace = text.indexOf('{');
+          if (firstBrace === -1) return null;
+          // Try to find a balanced JSON object by scanning
+          let depth = 0;
+          for (let i = firstBrace; i < text.length; i++) {
+            const ch = text[i];
+            if (ch === '{') depth++;
+            else if (ch === '}') depth--;
+            if (depth === 0) {
+              const candidate = text.slice(firstBrace, i + 1);
+              try {
+                return JSON.parse(candidate);
+              } catch (e) {
+                return null;
+              }
+            }
+          }
+          return null;
+        }
+
         let parsed: string[] | null = null;
-        try {
-          const j = JSON.parse(raw);
-          if (Array.isArray(j)) parsed = j.map(String);
-          else if (j.translations && Array.isArray(j.translations)) parsed = j.translations.map(String);
-        } catch (e) {
-          // ignore parse error
+        const maybe = extractJson(raw);
+        if (maybe) {
+          if (Array.isArray(maybe)) parsed = maybe.map(String);
+          else if (maybe.translations && Array.isArray(maybe.translations)) parsed = maybe.translations.map(String);
         }
 
         if (!parsed) {
-          // fallback: assume newline-separated
+          // fallback: assume newline-separated (last resort)
           parsed = String(raw).split('\n').filter(Boolean);
         }
 
