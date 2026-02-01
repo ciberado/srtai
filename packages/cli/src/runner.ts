@@ -16,6 +16,23 @@ export type TranslateArgs = {
   dryRun?: boolean;
 };
 
+function getOutputFilename(originalName: string, targetLang: string, isZip: boolean): string {
+  const ext = isZip ? '.zip' : '.srt';
+  // If it's a zip return .es.translated.zip, if srt return .es.srt
+  const suffix = isZip ? '.translated.zip' : '.srt'; 
+  
+  // Regex to match language code at the end of filename (e.g. .en.srt or .en-US.zip)
+  const langRegex = new RegExp(`\\.([a-z]{2,3}(?:-[a-z0-9]+)?)\\${ext}$`, 'i');
+
+  if (langRegex.test(originalName)) {
+    return originalName.replace(langRegex, `.${targetLang}${suffix}`);
+  }
+  // Fallback: just append/replace extension
+  // For zip: file.zip -> file.es.translated.zip
+  // For srt: file.srt -> file.es.srt
+  return originalName.replace(new RegExp(`\\${ext}$`, 'i'), `.${targetLang}${suffix}`);
+}
+
 async function isZip(file: string) {
   const b = await fs.readFile(file);
   // PK header
@@ -65,7 +82,7 @@ export async function runTranslate(args: TranslateArgs) {
           filename: path.basename(ze.entryName)
         });
         const rebuilt = rebuildFromTranslations(entries, translated);
-        const outName = path.basename(ze.entryName).replace(/\.srt$/, `.${args.to}.srt`);
+        const outName = getOutputFilename(path.basename(ze.entryName), args.to, false);
         
         // Return result to add to zip later (AdmZip is synchronous, but we can buffer)
         return {
@@ -105,7 +122,7 @@ export async function runTranslate(args: TranslateArgs) {
         }
       }
 
-      const outZip = path.join(outDir, path.basename(abs).replace(/\.zip$/, `.translated.zip`));
+      const outZip = path.join(outDir, getOutputFilename(path.basename(abs), args.to, true));
       zipOut.writeZip(outZip);
       results.push(outZip);
     } else if (stat.isFile()) {
@@ -122,7 +139,7 @@ export async function runTranslate(args: TranslateArgs) {
         filename: path.basename(abs)
       });
       const rebuilt = rebuildFromTranslations(entries, translated);
-      const outName = path.basename(abs).replace(/\.srt$/, `.${args.to}.srt`);
+      const outName = getOutputFilename(path.basename(abs), args.to, false);
       const outPath = path.join(outDir, outName);
       await fs.writeFile(outPath, serializeSrt(rebuilt), 'utf8');
       results.push(outPath);
