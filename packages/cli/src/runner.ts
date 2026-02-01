@@ -2,8 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import AdmZip from 'adm-zip';
-import { parseSrt, serializeSrt, rebuildFromTranslations } from '../../core/src/parser';
-import { translateEntries } from '../../core/src/translator';
+import { parseSrt, serializeSrt, rebuildFromTranslations, translateEntries } from '@srtai/core';
 
 export type TranslateArgs = {
   files: string[];
@@ -48,7 +47,8 @@ export async function runTranslate(args: TranslateArgs) {
             batchSize: args.batchSize,
             retries: args.retries,
             dryRun: args.dryRun,
-            targetLanguage: args.to
+            targetLanguage: args.to,
+            filename: path.basename(ze.entryName)
           });
           const rebuilt = rebuildFromTranslations(entries, translated);
           const outName = path.basename(ze.entryName).replace(/\.srt$/, `.${args.to}.srt`);
@@ -70,7 +70,8 @@ export async function runTranslate(args: TranslateArgs) {
         batchSize: args.batchSize,
         retries: args.retries,
         dryRun: args.dryRun,
-        targetLanguage: args.to
+        targetLanguage: args.to,
+        filename: path.basename(abs)
       });
       const rebuilt = rebuildFromTranslations(entries, translated);
       const outName = path.basename(abs).replace(/\.srt$/, `.${args.to}.srt`);
