@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Command } from 'commander';
 import { helloCore } from '@srtai/core';
 import { runTranslate } from './runner';
+import { configureLogger, logger } from './logger';
 
 // Try to load .env from current directory or up the tree
 try {
@@ -47,13 +48,20 @@ program
   .option('--retries <n>', 'retries', (v) => parseInt(v, 10), 3)
   .option('-o, --output <path>', 'output directory')
   .option('--dry-run', 'dry run (no external calls)')
+  .option('-v, --verbose', 'enable verbose logging')
   .action(async (files: string[], opts: any) => {
+    configureLogger({ verbose: opts.verbose });
     try {
       const modelId = opts.model || process.env.BEDROCK_MODEL_ID;
       const region = opts.region || process.env.AWS_REGION;
 
       if (!modelId) {
          throw new Error('Model ID is required (pass --model or set BEDROCK_MODEL_ID)');
+      }
+
+      logger.info(`Starting translation task for ${files.length} file(s)`);
+      if (opts.verbose) {
+         logger.debug(`Options: ${JSON.stringify(opts)}`);
       }
 
       const res = await runTranslate({
@@ -64,11 +72,12 @@ program
         batchSize: opts.batchSize,
         retries: opts.retries,
         output: opts.output,
+        concurrency: opts.concurrency,
         dryRun: opts.dryRun
       });
-      for (const r of res) console.log('Wrote', r);
+      for (const r of res) logger.info(`Wrote ${r}`);
     } catch (err: any) {
-      console.error('Error:', err?.message || err);
+      logger.error(`Error: ${err?.message || err}`);
       process.exit(1);
     }
   });

@@ -7,22 +7,18 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
-    "start": "node dist/index.js"
-  },
-  "dependencies": {
-    "commander": "^12.0.0",
-    "@srtai/core": "file:../core"
-  },
-  "devDependencies": {
-    "adm-zip": "^0.5.9",
-    "typescript": "^5.2.0",
-    "@types/node": "^20.0.0",
-    "vitest": "^1.0.0"
-  },
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "clean": "rm -rf dist",
     "start": "node dist/index.js",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@srtai/core": "file:../core",
+    "adm-zip": "^0.5.16",
+    "commander": "^12.0.0",
+    "winston": "^3.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.2.0",
+    "vitest": "^1.0.0"
   }
 }

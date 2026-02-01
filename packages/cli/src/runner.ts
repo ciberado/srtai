@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import AdmZip from 'adm-zip';
 import { parseSrt, serializeSrt, rebuildFromTranslations, translateEntries } from '@srtai/core';
+import { logger } from './logger';
 
 export type TranslateArgs = {
   files: string[];
@@ -47,27 +48,33 @@ export async function runTranslate(args: TranslateArgs) {
 
   for (const file of args.files) {
     const abs = path.resolve(file);
+    logger.info(`Processing file: ${file}`);
     const stat = await fs.stat(abs);
     if (stat.isFile() && await isZip(abs)) {
       // extract zip, process .srt inside, then build output zip
       const zip = new AdmZip(abs);
       const zipEntries = zip.getEntries();
       const zipOut = new AdmZip();
-      const originalsFolder = 'originals/';
-      const translatedFolder = 'translated/';
       
       const srtEntries = zipEntries.filter((ze: any) => ze.entryName.endsWith('.srt'));
       const otherEntries = zipEntries.filter((ze: any) => !ze.entryName.endsWith('.srt'));
       
+      logger.debug(`Found ${srtEntries.length} SRT files and ${otherEntries.length} other files in zip`);
+
       // Process non-srt files
       for (const ze of otherEntries) {
         zipOut.addFile(ze.entryName, ze.getData());
       }
       
+      const originalsFolder = 'originals/';
+      const translatedFolder = 'translated/';
+
       // Helper to process a single entry
       const processEntry = async (ze: any) => {
+        logger.info(`Translating zip entry: ${ze.entryName}`);
         const srtText = ze.getData().toString('utf8');
         const entries = parseSrt(srtText);
+        logger.debug(`Parsed ${entries.length} segments from ${ze.entryName}`);
         // When processing multiple files in parallel within a zip, we limit the per-file concurrency
         // to avoid exploding the total number of concurrent requests. 
         // We use 1 here so `args.concurrency` controls the number of FILES processed purely.
@@ -82,6 +89,7 @@ export async function runTranslate(args: TranslateArgs) {
           filename: path.basename(ze.entryName)
         });
         const rebuilt = rebuildFromTranslations(entries, translated);
+        logger.debug(`Rebuilt SRT for ${ze.entryName}`);
         const outName = getOutputFilename(path.basename(ze.entryName), args.to, false);
         
         // Return result to add to zip later (AdmZip is synchronous, but we can buffer)
@@ -98,6 +106,8 @@ export async function runTranslate(args: TranslateArgs) {
       // Use args.concurrency or default to 1 (sequential)
       const maxConcurrency = args.concurrency || 1;
       
+      logger.info(`Starting parallel processing with concurrency ${maxConcurrency}`);
+
       const resultsArray = new Array<any>(srtEntries.length);
       
       const worker = async () => {
@@ -124,10 +134,13 @@ export async function runTranslate(args: TranslateArgs) {
 
       const outZip = path.join(outDir, getOutputFilename(path.basename(abs), args.to, true));
       zipOut.writeZip(outZip);
+      logger.info(`Finished processing zip: ${outZip}`);
       results.push(outZip);
     } else if (stat.isFile()) {
+      logger.debug(`Reading file ${abs}`);
       const text = await fs.readFile(abs, 'utf8');
       const entries = parseSrt(text);
+      logger.info(`Translating ${abs} (${entries.length} segments)`);
       const translated = await translateEntries(entries, {
         modelId: args.model,
         region: args.region,
@@ -142,6 +155,7 @@ export async function runTranslate(args: TranslateArgs) {
       const outName = getOutputFilename(path.basename(abs), args.to, false);
       const outPath = path.join(outDir, outName);
       await fs.writeFile(outPath, serializeSrt(rebuilt), 'utf8');
+      logger.info(`Finished file: ${outPath}`);
       results.push(outPath);
     }
   }

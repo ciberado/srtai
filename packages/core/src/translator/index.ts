@@ -104,10 +104,6 @@ export async function translateEntries(entries: SrtEntry[], opts: TranslateOptio
           ? await opts.invokeOverride(modelId, region, prompt)
           : await invokeBedrock(modelId, region, prompt);
 
-        // DEBUG: dump raw value during tests
-        // eslint-disable-next-line no-console
-        console.log('RAW_RAW_TYPE', typeof raw, 'RAW_RAW_VALUE', JSON.stringify(raw));
-
         // Robust JSON extraction: model may emit extra chars; try to find first JSON value (object or array) in the response
         function extractJson(text: string): any | null {
           const str = String(text).trim();
