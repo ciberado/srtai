@@ -49,15 +49,55 @@ program
   .option('-o, --output <path>', 'output directory')
   .option('--dry-run', 'dry run (no external calls)')
   .option('-v, --verbose', 'enable verbose logging')
-  .action(async (files: string[], opts: any) => {
-    configureLogger({ verbose: opts.verbose });
-    try {
-      const modelId = opts.model || process.env.BEDROCK_MODEL_ID;
-      const region = opts.region || process.env.AWS_REGION;
+  .addHelpText('after', `
 
-      if (!modelId) {
-         throw new Error('Model ID is required (pass --model or set BEDROCK_MODEL_ID)');
+Examples:
+  $ srtai translate movie.srt -t es
+  $ srtai translate movie.srt -t fr --model anthropic.claude-v2
+  $ srtai translate season1/*.srt -t de --output translated/
+  $ srtai translate subtitles.zip -t pt-BR
+`)
+  .action(async (files: string[], opts: any, command: Command) => {
+    configureLogger({ verbose: opts.verbose });
+    let validationError = false;
+
+    // Validate numeric options
+    if (Number.isNaN(opts.batchSize)) {
+      logger.error('Option --batch-size must be a number');
+      validationError = true;
+    }
+    if (Number.isNaN(opts.retries)) {
+      logger.error('Option --retries must be a number');
+      validationError = true;
+    }
+    if (Number.isNaN(opts.concurrency)) {
+      logger.error('Option --concurrency must be a number');
+      validationError = true;
+    }
+
+    // Validate Model ID (env or flag)
+    const modelId = opts.model || process.env.BEDROCK_MODEL_ID;
+    if (!modelId) {
+      logger.error('Model ID is required. Pass --model or set BEDROCK_MODEL_ID env var.');
+      validationError = true;
+    }
+
+    // Validate files existence
+    for (const file of files) {
+      if (!fs.existsSync(file)) {
+        logger.error(`Input file not found: ${file}`);
+        validationError = true;
       }
+    }
+
+    if (validationError) {
+      console.log(''); // spacer
+      command.outputHelp();
+      process.exit(1);
+    }
+
+    try {
+      const region = opts.region || process.env.AWS_REGION;
 
       logger.info(`Starting translation task for ${files.length} file(s)`);
       if (opts.verbose) {
