@@ -1,4 +1,5 @@
 import { SrtEntry } from '../parser';
+import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 
 export type TranslateOptions = {
   modelId: string;
@@ -14,16 +15,6 @@ export type TranslateOptions = {
 };
 
 async function invokeBedrock(modelId: string, region: string | undefined, prompt: string) {
-  let BedrockRuntimeClient: any;
-  let ConverseCommand: any;
-  try {
-    const mod = await import('@aws-sdk/client-bedrock-runtime');
-    BedrockRuntimeClient = mod.BedrockRuntimeClient;
-    ConverseCommand = mod.ConverseCommand;
-  } catch (e) {
-    throw new Error('Missing dependency @aws-sdk/client-bedrock-runtime. Install it to use Bedrock integration.');
-  }
-
   const client = new BedrockRuntimeClient({ region });
 
   const cmd = new ConverseCommand({
