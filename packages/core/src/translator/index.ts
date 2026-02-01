@@ -8,6 +8,7 @@ export type TranslateOptions = {
   dryRun?: boolean; // if true, returns mocked translations
   targetLanguage?: string; // e.g. 'es'
   filename?: string;
+  concurrency?: number;
   invokeOverride?: (modelId: string, region: string | undefined, prompt: string) => Promise<string>;
 };
 
@@ -60,26 +61,21 @@ export async function translateEntries(entries: SrtEntry[], opts: TranslateOptio
   const modelId = opts.modelId;
   const region = opts.region;
   const dryRun = !!opts.dryRun;
+  const concurrency = opts.concurrency || 3;
   const target = opts.targetLanguage || 'es';
 
   const texts = entries.map((e) => e.text);
   const batches: string[][] = [];
   for (let i = 0; i < texts.length; i += batchSize) batches.push(texts.slice(i, i + batchSize));
 
-  const results: string[] = [];
-
-  for (const batch of batches) {
+  // Helper to process a single batch
+  const processBatch = async (batch: string[]): Promise<string[]> => {
     let attempt = 0;
-    let success = false;
-    let lastErr: Error | null = null;
-    while (attempt <= retries && !success) {
+    while (attempt <= retries) {
       try {
         if (dryRun) {
           // simple mock: prefix with language code
-          const translated = batch.map((t) => `[${target}] ${t}`);
-          results.push(...translated);
-          success = true;
-          break;
+          return batch.map((t) => `[${target}] ${t}`);
         }
 
         // Build a clear prompt with explicit instructions requesting ONLY valid JSON
@@ -199,24 +195,38 @@ export async function translateEntries(entries: SrtEntry[], opts: TranslateOptio
           while (parsed.length < batch.length) parsed.push(parsed[parsed.length - 1] || '');
         }
 
-        results.push(...parsed.slice(0, batch.length));
-        success = true;
+        return parsed.slice(0, batch.length);
       } catch (err: any) {
-        lastErr = err;
         attempt += 1;
-        if (attempt > retries) break;
+        if (attempt > retries) {
+          // eslint-disable-next-line no-console
+          console.error('Batch translation failed:', err);
+          break;
+        }
         // exponential backoff
-        await new Promise((r) => setTimeout(r, 500 * attempt));
+        // 500ms, 1000ms, 2000ms, 4000ms...
+        const delay = 500 * Math.pow(2, attempt - 1);
+        await new Promise((r) => setTimeout(r, delay));
       }
     }
-    if (!success) {
-      // push empty translations for failed batch and continue
-      for (let i = 0; i < batch.length; i++) results.push('');
-      // optionally log lastErr
-      // eslint-disable-next-line no-console
-      if (lastErr) console.error('Batch translation failed:', lastErr);
-    }
-  }
+    // Return placeholders if failed
+    return batch.map(() => '');
+  };
 
-  return results;
+  // Run batches with limited concurrency
+  const queue = batches.map((batch, index) => ({ batch, index }));
+  const resultsArray = new Array<string[]>(batches.length);
+
+  const worker = async () => {
+    while (queue.length > 0) {
+      const { batch, index } = queue.shift()!;
+      resultsArray[index] = await processBatch(batch);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, batches.length) }, () => worker())
+  );
+
+  return resultsArray.flat();
 }

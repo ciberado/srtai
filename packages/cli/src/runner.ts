@@ -12,6 +12,7 @@ export type TranslateArgs = {
   batchSize?: number;
   retries?: number;
   output?: string; // path to output dir or zip
+  concurrency?: number;
   dryRun?: boolean;
 };
 
@@ -37,27 +38,73 @@ export async function runTranslate(args: TranslateArgs) {
       const zipOut = new AdmZip();
       const originalsFolder = 'originals/';
       const translatedFolder = 'translated/';
-      for (const ze of zipEntries) {
-        if (ze.entryName.endsWith('.srt')) {
-          const srtText = ze.getData().toString('utf8');
-          const entries = parseSrt(srtText);
-          const translated = await translateEntries(entries, {
-            modelId: args.model,
-            region: args.region,
-            batchSize: args.batchSize,
-            retries: args.retries,
-            dryRun: args.dryRun,
-            targetLanguage: args.to,
-            filename: path.basename(ze.entryName)
-          });
-          const rebuilt = rebuildFromTranslations(entries, translated);
-          const outName = path.basename(ze.entryName).replace(/\.srt$/, `.${args.to}.srt`);
-          zipOut.addFile(originalsFolder + ze.entryName, Buffer.from(srtText, 'utf8'));
-          zipOut.addFile(translatedFolder + outName, Buffer.from(serializeSrt(rebuilt), 'utf8'));
-        } else {
-          zipOut.addFile(ze.entryName, ze.getData());
+      
+      const srtEntries = zipEntries.filter((ze: any) => ze.entryName.endsWith('.srt'));
+      const otherEntries = zipEntries.filter((ze: any) => !ze.entryName.endsWith('.srt'));
+      
+      // Process non-srt files
+      for (const ze of otherEntries) {
+        zipOut.addFile(ze.entryName, ze.getData());
+      }
+      
+      // Helper to process a single entry
+      const processEntry = async (ze: any) => {
+        const srtText = ze.getData().toString('utf8');
+        const entries = parseSrt(srtText);
+        // When processing multiple files in parallel within a zip, we limit the per-file concurrency
+        // to avoid exploding the total number of concurrent requests. 
+        // We use 1 here so `args.concurrency` controls the number of FILES processed purely.
+        const translated = await translateEntries(entries, {
+          modelId: args.model,
+          region: args.region,
+          batchSize: args.batchSize,
+          retries: args.retries,
+          dryRun: args.dryRun,
+          targetLanguage: args.to,
+          concurrency: 1, 
+          filename: path.basename(ze.entryName)
+        });
+        const rebuilt = rebuildFromTranslations(entries, translated);
+        const outName = path.basename(ze.entryName).replace(/\.srt$/, `.${args.to}.srt`);
+        
+        // Return result to add to zip later (AdmZip is synchronous, but we can buffer)
+        return {
+          originalEntryName: ze.entryName,
+          originalData: Buffer.from(srtText, 'utf8'),
+          translatedEntryName: outName,
+          translatedData: Buffer.from(serializeSrt(rebuilt), 'utf8')
+        };
+      };
+
+      // Parallel processing queue
+      const queue = srtEntries.map((ze: any, index: number) => ({ ze, index }));
+      // Use args.concurrency or default to 1 (sequential)
+      const maxConcurrency = args.concurrency || 1;
+      
+      const resultsArray = new Array<any>(srtEntries.length);
+      
+      const worker = async () => {
+        while (queue.length > 0) {
+          const item = queue.shift();
+          if (item) {
+             const { ze, index } = item;
+             resultsArray[index] = await processEntry(ze);
+          }
+        }
+      };
+
+      await Promise.all(
+        Array.from({ length: Math.min(maxConcurrency, srtEntries.length) }, () => worker())
+      );
+
+      // Add processed files to zip
+      for (const res of resultsArray) {
+        if (res) {
+          zipOut.addFile(originalsFolder + res.originalEntryName, res.originalData);
+          zipOut.addFile(translatedFolder + res.translatedEntryName, res.translatedData);
         }
       }
+
       const outZip = path.join(outDir, path.basename(abs).replace(/\.zip$/, `.translated.zip`));
       zipOut.writeZip(outZip);
       results.push(outZip);
@@ -71,6 +118,7 @@ export async function runTranslate(args: TranslateArgs) {
         retries: args.retries,
         dryRun: args.dryRun,
         targetLanguage: args.to,
+        concurrency: args.concurrency,
         filename: path.basename(abs)
       });
       const rebuilt = rebuildFromTranslations(entries, translated);
