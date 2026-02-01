@@ -5,20 +5,27 @@
     "srtai": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsup src/index.ts --format cjs --minify --no-splitting --sourcemap --clean",
     "clean": "rm -rf dist",
     "start": "node dist/index.js",
     "test": "vitest run"
   },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
-    "@srtai/core": "file:../core",
-    "@types/cli-progress": "^3.11.6",
+    "@aws-sdk/client-bedrock-runtime": "^3.0.0",
     "adm-zip": "^0.5.16",
     "cli-progress": "^3.12.0",
     "commander": "^12.0.0",
+    "he": "^1.2.0",
+    "subtitle": "^4.0.0",
     "winston": "^3.19.0"
   },
   "devDependencies": {
+    "@srtai/core": "file:../core",
+    "@types/cli-progress": "^3.11.6",
+    "tsup": "^8.5.1",
     "@types/node": "^20.0.0",
     "typescript": "^5.2.0",
     "vitest": "^1.0.0"
