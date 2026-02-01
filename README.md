@@ -19,13 +19,13 @@ You can run the tool directly using `npx`:
 
 ```bash
 # Basic file translation
-npx @srtai/cli translate movie.en.srt --to es --model anthropic.claude-3-haiku-20240307-v1:0
+npx @ciberado/srtai translate movie.en.srt --to es --model anthropic.claude-3-haiku-20240307-v1:0
 
 # Process a directory
-npx @srtai/cli translate season1/*.srt --to fr
+npx @ciberado/srtai translate season1/*.srt --to fr
 
 # Process a zip file
-npx @srtai/cli translate subtitles.zip --to pt-BR
+npx @ciberado/srtai translate subtitles.zip --to pt-BR
 ```
 
 ### Options
@@ -95,7 +95,7 @@ This project is a monorepo using npm workspaces.
 ### Setup
 
 ```bash
-git clone https://github.com/your-username/srtai.git
+git clone https://github.com/ciberado/srtai.git
 cd srtai
 npm install
 ```
@@ -116,5 +116,5 @@ npm test --workspaces
 
 ## Architecture
 
-- **@srtai/core**: Contains the logic for parsing SRTs, handling batches, and communicating with AWS Bedrock.
-- **@srtai/cli**: The command-line interface implementation using `commander`, `cli-progress`, and `winston`.
+- **@ciberado/srtai-core**: Contains the logic for parsing SRTs, handling batches, and communicating with AWS Bedrock.
+- **@ciberado/srtai**: The command-line interface implementation using `commander`, `cli-progress`, and `winston`.

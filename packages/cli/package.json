@@ -1,5 +1,5 @@
 {
-  "name": "@srtai/cli",
+  "name": "@ciberado/srtai",
   "version": "0.1.0",
   "bin": {
     "srtai": "dist/index.js"
@@ -23,7 +23,7 @@
     "winston": "^3.19.0"
   },
   "devDependencies": {
-    "@srtai/core": "file:../core",
+    "@ciberado/srtai-core": "file:../core",
     "@types/cli-progress": "^3.11.6",
     "tsup": "^8.5.1",
     "@types/node": "^20.0.0",

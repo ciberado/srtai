@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 import AdmZip from 'adm-zip';
 import { MultiBar, Presets } from 'cli-progress';
-import { parseSrt, serializeSrt, rebuildFromTranslations, translateEntries } from '@srtai/core';
+import { parseSrt, serializeSrt, rebuildFromTranslations, translateEntries } from '@ciberado/srtai-core';
 import { logger } from './logger';
 
 export type TranslateArgs = {

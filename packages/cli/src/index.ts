@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Command } from 'commander';
-import { helloCore } from '@srtai/core';
+import { helloCore } from '@ciberado/srtai-core';
 import { runTranslate } from './runner';
 import { configureLogger, logger } from './logger';
 
