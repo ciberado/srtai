@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@srtai/core": "file:../core",
+    "@types/cli-progress": "^3.11.6",
     "adm-zip": "^0.5.16",
+    "cli-progress": "^3.12.0",
     "commander": "^12.0.0",
     "winston": "^3.19.0"
   },

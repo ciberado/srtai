@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import AdmZip from 'adm-zip';
+import { MultiBar, Presets } from 'cli-progress';
 import { parseSrt, serializeSrt, rebuildFromTranslations, translateEntries } from '@srtai/core';
 import { logger } from './logger';
 
@@ -41,12 +42,20 @@ async function isZip(file: string) {
 }
 
 export async function runTranslate(args: TranslateArgs) {
+  const multibar = new MultiBar({
+    ...Presets.shades_classic,
+    clearOnComplete: false,
+    hideCursor: true,
+    format: ' {bar} | {filename} | {value}/{total} | {percentage}%',
+  });
+
   const outDir = args.output ? path.resolve(args.output) : path.resolve(process.cwd(), 'translated');
   await fs.mkdir(outDir, { recursive: true });
 
   const results: string[] = [];
 
-  for (const file of args.files) {
+  try {
+    for (const file of args.files) {
     const abs = path.resolve(file);
     logger.info(`Processing file: ${file}`);
     const stat = await fs.stat(abs);
@@ -75,6 +84,9 @@ export async function runTranslate(args: TranslateArgs) {
         const srtText = ze.getData().toString('utf8');
         const entries = parseSrt(srtText);
         logger.debug(`Parsed ${entries.length} segments from ${ze.entryName}`);
+        
+        const bar = multibar.create(entries.length, 0, { filename: ze.entryName });
+
         // When processing multiple files in parallel within a zip, we limit the per-file concurrency
         // to avoid exploding the total number of concurrent requests. 
         // We use 1 here so `args.concurrency` controls the number of FILES processed purely.
@@ -86,8 +98,12 @@ export async function runTranslate(args: TranslateArgs) {
           dryRun: args.dryRun,
           targetLanguage: args.to,
           concurrency: 1, 
-          filename: path.basename(ze.entryName)
+          filename: path.basename(ze.entryName),
+          onProgress: (p) => bar.update(p)
         });
+        
+        multibar.remove(bar);
+
         const rebuilt = rebuildFromTranslations(entries, translated);
         logger.debug(`Rebuilt SRT for ${ze.entryName}`);
         const outName = getOutputFilename(path.basename(ze.entryName), args.to, false);
@@ -141,6 +157,9 @@ export async function runTranslate(args: TranslateArgs) {
       const text = await fs.readFile(abs, 'utf8');
       const entries = parseSrt(text);
       logger.info(`Translating ${abs} (${entries.length} segments)`);
+      
+      const bar = multibar.create(entries.length, 0, { filename: path.basename(abs) });
+
       const translated = await translateEntries(entries, {
         modelId: args.model,
         region: args.region,
@@ -149,8 +168,12 @@ export async function runTranslate(args: TranslateArgs) {
         dryRun: args.dryRun,
         targetLanguage: args.to,
         concurrency: args.concurrency,
-        filename: path.basename(abs)
+        filename: path.basename(abs),
+        onProgress: (p) => bar.update(p)
       });
+      
+      multibar.remove(bar);
+
       const rebuilt = rebuildFromTranslations(entries, translated);
       const outName = getOutputFilename(path.basename(abs), args.to, false);
       const outPath = path.join(outDir, outName);
@@ -158,6 +181,9 @@ export async function runTranslate(args: TranslateArgs) {
       logger.info(`Finished file: ${outPath}`);
       results.push(outPath);
     }
+  }
+  } finally {
+    multibar.stop();
   }
 
   return results;

@@ -9,6 +9,7 @@ export type TranslateOptions = {
   targetLanguage?: string; // e.g. 'es'
   filename?: string;
   concurrency?: number;
+  onProgress?: (processed: number, total: number) => void;
   invokeOverride?: (modelId: string, region: string | undefined, prompt: string) => Promise<string>;
 };
 
@@ -212,11 +213,16 @@ export async function translateEntries(entries: SrtEntry[], opts: TranslateOptio
   // Run batches with limited concurrency
   const queue = batches.map((batch, index) => ({ batch, index }));
   const resultsArray = new Array<string[]>(batches.length);
+  let processedCount = 0;
 
   const worker = async () => {
     while (queue.length > 0) {
       const { batch, index } = queue.shift()!;
       resultsArray[index] = await processBatch(batch);
+      processedCount += batch.length;
+      if (opts.onProgress) {
+        opts.onProgress(processedCount, entries.length);
+      }
     }
   };
 
