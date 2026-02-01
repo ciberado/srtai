@@ -61,3 +61,6 @@ packages/*/logs/
 !.vscode/extensions.json
 
 .env
+translated/
+examples/*.zip
+examples/*.srt

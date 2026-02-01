@@ -37,4 +37,31 @@ describe('CLI translate zip e2e (dryRun)', () => {
     expect(translatedFiles.length).toBeGreaterThanOrEqual(1);
     expect(translatedFiles.some((n) => n.endsWith('.es.srt'))).toBeTruthy();
   });
+
+  it('handles concurrency option correctly for multiple files in zip', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'srtai-zip-parallel-'));
+    const zip = new AdmZip();
+    // Add multiple files
+    for (let i = 0; i < 5; i++) {
+        zip.addFile(`file${i}.srt`, Buffer.from(`1\n00:00:00,000 --> 00:00:02,000\nLine ${i}`, 'utf8'));
+    }
+    const inZipPath = path.join(tmp, 'parallel.zip');
+    zip.writeZip(inZipPath);
+
+    const outs = await runTranslate({
+      files: [inZipPath],
+      to: 'es',
+      model: 'dummy',
+      dryRun: true,
+      concurrency: 3, 
+      output: tmp
+    });
+
+    const outZipPath = outs[0];
+    const outZip = new AdmZip(outZipPath);
+    const entries = outZip.getEntries();
+    // verify all 5 are translated
+    const translated = entries.filter(e => e.entryName.startsWith('translated/') && e.entryName.endsWith('.es.srt'));
+    expect(translated.length).toBe(5);
+  });
 });

@@ -62,4 +62,29 @@ describe('Translator retry behavior', () => {
     expect(out[0]).toBe('');
     expect(out[1]).toBe('');
   });
+
+  it('implements exponential backoff', async () => {
+    const entries = parseSrt(sampleSrt);
+    let attempts = 0;
+    const invokeMock = async () => {
+      attempts++;
+      if (attempts <= 2) {
+        throw new Error('fail');
+      }
+      return JSON.stringify(['OK', 'OK']);
+    };
+
+    const start = Date.now();
+    await translateEntries(entries, {
+        modelId: 'm',
+        batchSize: 2,
+        retries: 2,
+        invokeOverride: invokeMock
+    });
+    const elapsed = Date.now() - start;
+    
+    // Attempt 1 fails -> wait 500ms -> Attempt 2 fails -> wait 1000ms -> Attempt 3 succeeds.
+    // Total wait ~ 1500ms.
+    expect(elapsed).toBeGreaterThanOrEqual(1400); // Allow some margin
+  });
 });
